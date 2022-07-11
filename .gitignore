@@ -1,0 +1,14 @@
+*.class
+*.jar
+*.log
+.cache
+.history
+.lib/
+project/project/
+project/target/
+target/
+null/
+.bloop
+.bsp
+.metals
+project/metals.sbt
