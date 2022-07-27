@@ -256,7 +256,7 @@ object Testable:
     val name = s"Set[${TT.name}]"
     def parse(src: Src): Set[T] = pSet(TT.parse)(src)
 
-    def norm(x: Set[T]): Iterator[T] = x.toList.sortWith(TT.lt).iterator
+    def norm(x: Set[T]): Iterator[T] = x.toList.sortWith(TT.lt).iterator // stable sort!
     override def show(x: Set[T]): String = norm(x).mkString("Set(",", ",")")
     override def copy(x: Set[T]): Set[T] = x.map(TT.copy)
     override def equiv(x: Set[T], y: Set[T]): Boolean = multiequiv(norm(x), norm(y), TT)
@@ -270,7 +270,7 @@ object Testable:
     val name = s"Map[${TT1.name},${TT2.name}]"
     def parse(src: Src): Map[T1,T2] = pMap(TT1.parse, TT2.parse)(src)
 
-    def norm(x: Map[T1,T2]) = x.toList.sortWith(Pair.lt).iterator
+    def norm(x: Map[T1,T2]) = x.toList.sortWith(Pair.lt).iterator // stable sort!
     override def show(x: Map[T1,T2]) =
       norm(x).map(p => TT1.show(p._1) + " -> " + TT2.show(p._2)).mkString("Map(",", ",")")
     override def copy(x: Map[T1,T2]) = x.toList.map(Pair.copy).toMap
@@ -334,12 +334,72 @@ object Testable:
       else if TT1.lt(y._1,x._1) then false
       else if TT2.lt(x._2,y._2) then true
       else if TT2.lt(y._2,x._2) then false
-      else TT3.lt(x._3,y._3)
+      else if TT3.lt(x._3,y._3) then true
+      else if TT3.lt(y._3,x._3) then false
+      else TT4.lt(x._4,y._4)
     override def checkInvariant(x: Tuple4[T1,T2,T3,T4]): Unit =
       TT1.checkInvariant(x._1)
       TT2.checkInvariant(x._2)
       TT3.checkInvariant(x._3)
       TT4.checkInvariant(x._4)
+
+  given TestableTuple5[T1,T2,T3,T4,T5](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5]): Testable[Tuple5[T1,T2,T3,T4,T5]] with
+    val name = s"Tuple5[${TT1.name},${TT2.name},${TT3.name},${TT4.name},${TT5.name}]"
+    def parse(src: Src): Tuple5[T1,T2,T3,T4,T5] =
+      pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse)(src)
+    override def show(x: Tuple5[T1,T2,T3,T4,T5]): String =
+      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)},${TT5.show(x._5)})"
+    override def copy(x: Tuple5[T1,T2,T3,T4,T5]): Tuple5[T1,T2,T3,T4,T5] =
+      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5))
+    override def equiv(x: Tuple5[T1,T2,T3,T4,T5], y: Tuple5[T1,T2,T3,T4,T5]): Boolean =
+      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3) && TT4.equiv(x._4,y._4) && TT5.equiv(x._5,y._5)
+    override def lt(x: Tuple5[T1,T2,T3,T4,T5], y: Tuple5[T1,T2,T3,T4,T5]): Boolean =
+      if TT1.lt(x._1,y._1) then true
+      else if TT1.lt(y._1,x._1) then false
+      else if TT2.lt(x._2,y._2) then true
+      else if TT2.lt(y._2,x._2) then false
+      else if TT3.lt(x._3,y._3) then true
+      else if TT3.lt(y._3,x._3) then false
+      else if TT4.lt(x._4,y._4) then true
+      else if TT4.lt(y._4,x._4) then false
+      else TT5.lt(x._5,y._5)
+    override def checkInvariant(x: Tuple5[T1,T2,T3,T4,T5]): Unit =
+      TT1.checkInvariant(x._1)
+      TT2.checkInvariant(x._2)
+      TT3.checkInvariant(x._3)
+      TT4.checkInvariant(x._4)
+      TT5.checkInvariant(x._5)
+
+  given TestableTuple6[T1,T2,T3,T4,T5,T6](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5], TT6: Testable[T6]): Testable[Tuple6[T1,T2,T3,T4,T5,T6]] with
+    val name = s"Tuple6[${TT1.name},${TT2.name},${TT3.name},${TT4.name},${TT5.name},${TT6.name}]"
+    def parse(src: Src): Tuple6[T1,T2,T3,T4,T5,T6] =
+      pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse,TT6.parse)(src)
+    override def show(x: Tuple6[T1,T2,T3,T4,T5,T6]): String =
+      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)},${TT5.show(x._5)},${TT6.show(x._6)})"
+    override def copy(x: Tuple6[T1,T2,T3,T4,T5,T6]): Tuple6[T1,T2,T3,T4,T5,T6] =
+      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5), TT6.copy(x._6))
+    override def equiv(x: Tuple6[T1,T2,T3,T4,T5,T6], y: Tuple6[T1,T2,T3,T4,T5,T6]): Boolean =
+      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3) && TT4.equiv(x._4,y._4) && TT5.equiv(x._5,y._5) && TT6.equiv(x._6,y._6)
+    override def lt(x: Tuple6[T1,T2,T3,T4,T5,T6], y: Tuple6[T1,T2,T3,T4,T5,T6]): Boolean =
+      if TT1.lt(x._1,y._1) then true
+      else if TT1.lt(y._1,x._1) then false
+      else if TT2.lt(x._2,y._2) then true
+      else if TT2.lt(y._2,x._2) then false
+      else if TT3.lt(x._3,y._3) then true
+      else if TT3.lt(y._3,x._3) then false
+      else if TT4.lt(x._4,y._4) then true
+      else if TT4.lt(y._4,x._4) then false
+      else if TT5.lt(x._5,y._5) then true
+      else if TT5.lt(y._5,x._5) then false
+      else TT6.lt(x._6,y._6)
+    override def checkInvariant(x: Tuple6[T1,T2,T3,T4,T5,T6]): Unit =
+      TT1.checkInvariant(x._1)
+      TT2.checkInvariant(x._2)
+      TT3.checkInvariant(x._3)
+      TT4.checkInvariant(x._4)
+      TT5.checkInvariant(x._5)
+      TT6.checkInvariant(x._6)
+
 
   /** Provides an easier-to-read display for two-dimensional arrays by
     * formatting them as a grid.
@@ -363,13 +423,17 @@ object Testable:
     *   Array(Array(1, 0, 10), Array(3, 7), Array(67, 2, 192))
     * ```
     *
-    * To use this as a replacement for `Testable[Array[Array[T]]]`, include it
-    * in an explicit "using" clause, as in
-    * ```
-    *   test("column", column, "matrix")(using Testable.TestableGrid[Int])
-    * ```
-    *
     * **Warning:** Best used with grids that are small enough not to wrap.
+    *
+    * To use this as a replacement for `Testable[Array[Array[T]]]`, precede the
+    * `test` with a `given`, as in
+    * ```
+    *   given hwtest.Testable[Array[Array[Int]]] = hwtest.Testable.TestableGrid[Int]
+    *   test("column", column, "matrix")
+    * ```
+    * However, this can also affect the display of *other* tests that involve
+    * an `Array[Array[Int]`. If necessary, you can avoid that by surounding the
+    * `given...` and `test...` with `{` and `}`.
     */
   def TestableGrid[T: reflect.ClassTag](using T: Testable[T]): Testable[Array[Array[T]]] = new Testable[Array[Array[T]]]:
     // do everything the same as AAT except show

@@ -127,7 +127,13 @@ class DotsReporter(timeLimit: Int, failureLimit: Int) extends Reporter:
 
   def startTests(name: String): Unit =
     println(s"Begin testing $name at ${new Date().toString}")
-    if timeLimit != defaultTimeLimit then println(s"[timeLimit = $timeLimit milliseconds]")
+    var messages = List.empty[String]
+    if failureLimit != defaultFailureLimit then
+      messages ::= s"failureLimit = $failureLimit"
+    if timeLimit != defaultTimeLimit then
+      messages ::= s"timeLimit = ${timeLimit}ms"
+    if messages.nonEmpty then
+      println(messages.mkString("[", ", ", "]"))
     startTime = new Date().getTime()
 
   def finishTests(): Unit =

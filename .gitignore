@@ -1,7 +1,6 @@
 *.class
 *.jar
 *.log
-.cache
 .history
 .lib/
 project/project/
