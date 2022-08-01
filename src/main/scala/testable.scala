@@ -30,11 +30,66 @@ trait Testable[A]:
     checkInvariant(a)
     a
 
-  /** Returns a string representing this value for display to the user.
+  /** The internal logic to be used by the `show` method.
     *
-    * Will often be overridden when defining a new `Testable`.
+    * Should never be called except by the `show` or `_format` methods from the
+    * same `Testable` instance.  All other calls should be to `show` instead.
+    *
+    * The returned string should normally **not** contain any line breaks,
+    * except possibly when a line break occurs in the contents of a quoted
+    * `String` or `Char`.
+    *
+    * The default implementation simply uses the `toString()` method of
+    * the corresponding type. However, this method should be overridden if
+    *   1. if the `toString()` method omits information or could otherwise
+    *      be confusing (for example, displaying strings without quotation
+    *      marks could easily lead to confusion), or
+    *   2. a type contains, or might contain, one or more subcomponents for
+    *      which the `toString()` method on the subcomponent(s) might be
+    *      confusing.  For example, this applies to virtually any polymorphic
+    *      collection type.
     */
-  def show(x: A): String = if x==null then "null" else x.toString
+  protected[Testable] def _show(x: A): String = x.toString()
+
+  /** Returns a string representing the given value for display to the user.
+    *
+    * The returned string should normally **not** contain any line breaks,
+    * except possibly when a line break occurs in the contents of a quoted
+    * `String` or `Char`.
+    *
+    * Equivalent to `_show` except includes a check for `null`.
+    *
+    * To change the behavior of `show`, override `_show` instead.
+    */
+  final def show(x: A): String = if x == null then "null" else _show(x)
+
+  /** The internal logic to be used by the `format` method.
+    *
+    * The default implementation simply delegates to `_show`, which is
+    * appropriate for most types.
+    *
+    * Only override this method when there is a multi-line format that
+    * makes the data significantly easier to understand.
+    */
+  protected[Testable] def _format(x: A): String = _show(x)
+
+  /** Returns a possibly-formatted string representing the given top-level
+    * value for display to the user.
+    *
+    * A *top-level* value is one that is a direct argument to or the direct
+    * result from a function being tested. All nested values should be
+    * displayed using `show`.
+    *
+    * For example, if a function returns a `BinaryTree`, that result will be
+    * displayed in a graphical format, but if a function returns a list of
+    * `BinaryTree`s, that list (including the trees) will be displayed in
+    * a single-line format.
+    *
+    * Equivalent to `_format` except includes a check for `null`.
+    *
+    * To change the behavior of `format`, override `_format` instead.
+    */
+  final def format(x: A): String = _format(x)
 
   /** Returns a deep copy of `x`.
     *
@@ -119,7 +174,17 @@ trait Testable[A]:
     */
   def checkInvariant(x: A): Unit = {}
 
-  def label(name: String, x: A): String = s"$name = ${show(x)}\n"
+  def label(name: String, x: A): String =
+    val prefix = if name.endsWith(":") then name else s"$name ="
+    val dataString = format(x)
+    // If dataString starts with a line break, omit the space
+    // between the prefix and dataString. This avoids an annoying
+    // interaction between trailing spaces in the output of tests
+    // and an editor that removes trailing spaces.
+    if dataString.startsWith("\n") || dataString.startsWith("\r\n") then
+      s"$prefix$dataString\n"
+    else
+      s"$prefix $dataString\n"
 
   // the multiX methods are used when A is actually a collection of T's
 
@@ -132,7 +197,7 @@ trait Testable[A]:
     *
     * When `multiequiv` is called, the collections must be converted
     * to iterators, and might need to be *normalized*, usually by
-    * sorting, so that corresponding elements end up corresponding
+    * sorting, so that corresponding elements end up in corresponding
     * order. (Typcially such normalization would be needed for unordered
     * collections but not for ordered collections.)
     */
@@ -210,19 +275,20 @@ object Testable:
   given TestableChar: Testable[Char] with
     val name = "Char"
     def parse(src: Src): Char = pChar(src)
-    override def show(x: Char): String = s"'$x'" // does NOT try to display escape sequences
+    override def _show(x: Char): String = s"'$x'" // does NOT try to display escape sequences
     override def lt(x: Char, y: Char): Boolean = x < y
 
   given TestableString: Testable[String] with
     val name = "String"
     def parse(src: Src): String = pString(src)
-    override def show(x: String): String = s""""$x"""" // does NOT try to display escape sequences
+    override def _show(x: String): String =
+      s""""$x"""" // does NOT try to display escape sequences
     override def lt(x: String, y: String): Boolean = x < y
 
   given TestableOption[T](using TT: Testable[T]): Testable[Option[T]] with
     val name = s"Option[${TT.name}]"
     def parse(src: Src): Option[T] = pOption(TT.parse)(src)
-    override def show(x: Option[T]): String = x.map(TT.show).toString
+    override def _show(x: Option[T]): String = x.map(TT.show).toString
     override def copy(x: Option[T]): Option[T] = x.map(TT.copy)
     override def equiv(x: Option[T], y: Option[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
     override def lt(x: Option[T], y: Option[T]): Boolean = multilt(x.iterator,y.iterator,TT)
@@ -232,7 +298,7 @@ object Testable:
   given TestableList[T](using TT: Testable[T]): Testable[List[T]] with
     val name = s"List[${TT.name}]"
     def parse(src: Src): List[T] = pList(TT.parse)(src)
-    override def show(x: List[T]): String = x.map(TT.show).toString
+    override def _show(x: List[T]): String = x.map(TT.show).toString
     override def copy(x: List[T]): List[T] = x.map(TT.copy)
     override def equiv(x: List[T], y: List[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
     override def lt(x: List[T], y: List[T]): Boolean = multilt(x.iterator,y.iterator,TT)
@@ -245,7 +311,7 @@ object Testable:
     def parse(src: Src): Array[T] =
       val parser = pArray(TT.parse)
       parser(src)
-    override def show(x: Array[T]): String = x.map(TT.show).mkString("Array(",", ",")")
+    override def _show(x: Array[T]): String = x.map(TT.show).mkString("Array(",", ",")")
     override def copy(x: Array[T]): Array[T] = x.map(TT.copy)
     override def equiv(x: Array[T], y: Array[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
     override def lt(x: Array[T], y: Array[T]): Boolean = multilt(x.iterator,y.iterator,TT)
@@ -257,7 +323,7 @@ object Testable:
     def parse(src: Src): Set[T] = pSet(TT.parse)(src)
 
     def norm(x: Set[T]): Iterator[T] = x.toList.sortWith(TT.lt).iterator // stable sort!
-    override def show(x: Set[T]): String = norm(x).mkString("Set(",", ",")")
+    override def _show(x: Set[T]): String = norm(x).mkString("Set(",", ",")")
     override def copy(x: Set[T]): Set[T] = x.map(TT.copy)
     override def equiv(x: Set[T], y: Set[T]): Boolean = multiequiv(norm(x), norm(y), TT)
     override def lt(x: Set[T], y: Set[T]): Boolean = multilt(norm(x), norm(y), TT)
@@ -267,11 +333,11 @@ object Testable:
   given TestableMap[T1,T2](using TT1: Testable[T1], TT2: Testable[T2]): Testable[Map[T1,T2]] with
     val Pair = TestableTuple2[T1,T2]
 
-    val name = s"Map[${TT1.name},${TT2.name}]"
+    val name = s"Map[${TT1.name}, ${TT2.name}]"
     def parse(src: Src): Map[T1,T2] = pMap(TT1.parse, TT2.parse)(src)
 
     def norm(x: Map[T1,T2]) = x.toList.sortWith(Pair.lt).iterator // stable sort!
-    override def show(x: Map[T1,T2]) =
+    override def _show(x: Map[T1,T2]) =
       norm(x).map(p => TT1.show(p._1) + " -> " + TT2.show(p._2)).mkString("Map(",", ",")")
     override def copy(x: Map[T1,T2]) = x.toList.map(Pair.copy).toMap
     override def equiv(x: Map[T1,T2], y: Map[T1,T2]): Boolean = multiequiv(norm(x),norm(y),Pair)
@@ -282,9 +348,9 @@ object Testable:
         TT2.checkInvariant(v)
 
   given TestableTuple2[T1,T2](using TT1: Testable[T1], TT2: Testable[T2]): Testable[Tuple2[T1,T2]] with
-    val name = s"Tuple2[${TT1.name},${TT2.name}]"
+    val name = s"Tuple2[${TT1.name}, ${TT2.name}]"
     def parse(src: Src): Tuple2[T1,T2] = pTuple(TT1.parse, TT2.parse)(src)
-    override def show(x: Tuple2[T1,T2]): String =
+    override def _show(x: Tuple2[T1,T2]): String =
       s"(${TT1.show(x._1)}, ${TT2.show(x._2)})"
     override def copy(x: Tuple2[T1,T2]): Tuple2[T1,T2] =
       (TT1.copy(x._1), TT2.copy(x._2))
@@ -299,10 +365,10 @@ object Testable:
       TT2.checkInvariant(x._2)
 
   given TestableTuple3[T1,T2,T3](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3]): Testable[Tuple3[T1,T2,T3]] with
-    val name = s"Tuple3[${TT1.name},${TT2.name},${TT3.name}]"
+    val name = s"Tuple3[${TT1.name}, ${TT2.name}, ${TT3.name}]"
     def parse(src: Src): Tuple3[T1,T2,T3] =
       pTuple(TT1.parse,TT2.parse,TT3.parse)(src)
-    override def show(x: Tuple3[T1,T2,T3]): String =
+    override def _show(x: Tuple3[T1,T2,T3]): String =
       s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)})"
     override def copy(x: Tuple3[T1,T2,T3]): Tuple3[T1,T2,T3] =
       (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3))
@@ -320,10 +386,10 @@ object Testable:
       TT3.checkInvariant(x._3)
 
   given TestableTuple4[T1,T2,T3,T4](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4]): Testable[Tuple4[T1,T2,T3,T4]] with
-    val name = s"Tuple4[${TT1.name},${TT2.name},${TT3.name},${TT4.name}]"
+    val name = s"Tuple4[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}]"
     def parse(src: Src): Tuple4[T1,T2,T3,T4] =
       pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse)(src)
-    override def show(x: Tuple4[T1,T2,T3,T4]): String =
+    override def _show(x: Tuple4[T1,T2,T3,T4]): String =
       s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)})"
     override def copy(x: Tuple4[T1,T2,T3,T4]): Tuple4[T1,T2,T3,T4] =
       (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4))
@@ -344,11 +410,11 @@ object Testable:
       TT4.checkInvariant(x._4)
 
   given TestableTuple5[T1,T2,T3,T4,T5](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5]): Testable[Tuple5[T1,T2,T3,T4,T5]] with
-    val name = s"Tuple5[${TT1.name},${TT2.name},${TT3.name},${TT4.name},${TT5.name}]"
+    val name = s"Tuple5[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}, ${TT5.name}]"
     def parse(src: Src): Tuple5[T1,T2,T3,T4,T5] =
       pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse)(src)
-    override def show(x: Tuple5[T1,T2,T3,T4,T5]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)},${TT5.show(x._5)})"
+    override def _show(x: Tuple5[T1,T2,T3,T4,T5]): String =
+      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)}, ${TT5.show(x._5)})"
     override def copy(x: Tuple5[T1,T2,T3,T4,T5]): Tuple5[T1,T2,T3,T4,T5] =
       (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5))
     override def equiv(x: Tuple5[T1,T2,T3,T4,T5], y: Tuple5[T1,T2,T3,T4,T5]): Boolean =
@@ -371,11 +437,11 @@ object Testable:
       TT5.checkInvariant(x._5)
 
   given TestableTuple6[T1,T2,T3,T4,T5,T6](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5], TT6: Testable[T6]): Testable[Tuple6[T1,T2,T3,T4,T5,T6]] with
-    val name = s"Tuple6[${TT1.name},${TT2.name},${TT3.name},${TT4.name},${TT5.name},${TT6.name}]"
+    val name = s"Tuple6[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}, ${TT5.name}, ${TT6.name}]"
     def parse(src: Src): Tuple6[T1,T2,T3,T4,T5,T6] =
       pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse,TT6.parse)(src)
-    override def show(x: Tuple6[T1,T2,T3,T4,T5,T6]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)},${TT5.show(x._5)},${TT6.show(x._6)})"
+    override def _show(x: Tuple6[T1,T2,T3,T4,T5,T6]): String =
+      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)}, ${TT5.show(x._5)}, ${TT6.show(x._6)})"
     override def copy(x: Tuple6[T1,T2,T3,T4,T5,T6]): Tuple6[T1,T2,T3,T4,T5,T6] =
       (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5), TT6.copy(x._6))
     override def equiv(x: Tuple6[T1,T2,T3,T4,T5,T6], y: Tuple6[T1,T2,T3,T4,T5,T6]): Boolean =
@@ -436,7 +502,7 @@ object Testable:
     * `given...` and `test...` with `{` and `}`.
     */
   def TestableGrid[T: reflect.ClassTag](using T: Testable[T]): Testable[Array[Array[T]]] = new Testable[Array[Array[T]]]:
-    // do everything the same as AAT except show
+    // do everything the same as AAT except format
     val AAT = TestableArray[Array[T]]
     val name = AAT.name
     def parse(src: Src): Array[Array[T]] = AAT.parse(src)
@@ -447,8 +513,8 @@ object Testable:
     // note that checkInvariant does NOT check that the grid is rectangular
     override def checkInvariant(x: Array[Array[T]]): Unit = { AAT.checkInvariant(x) }
 
-    // show pads elements to make each column line up nicely
-    override def show(g: Array[Array[T]]): String =
+    // _format pads elements to make each column line up nicely
+    override def _format(g: Array[Array[T]]): String =
       if g == null || g.isEmpty || g.exists(_ == null) then return AAT.show(g)
       val numColumns = g(0).length
       // bail out to default if grid is not rectangular

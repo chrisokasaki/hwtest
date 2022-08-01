@@ -1,6 +1,6 @@
 lazy val root = project.in(file(".")).settings(
   name := "hwtest",
-  version := "0.2.0",
+  version := "0.3.0",
   scalaVersion := "3.1.3",
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
   ThisBuild / versionScheme := Some("semver-spec"),

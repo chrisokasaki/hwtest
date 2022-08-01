@@ -261,7 +261,7 @@ package mlist
       val TML = MList.TestableMList
       def parse(src: Src): MHeader[A] = MHeader(TA.parse(src), TML.parse(src))
       val TS = Testable.TestableString
-      override def show(x: MHeader[A]): String =
+      override def _show(x: MHeader[A]): String =
         val listString = x.front.toString().drop(6) // drop "MList("
         s"MHeader(${TA.show(x.info)} ; $listString"
       override def equiv(x: MHeader[A], y: MHeader[A]): Boolean =

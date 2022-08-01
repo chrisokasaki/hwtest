@@ -67,6 +67,7 @@ val minimumFailureLimit = 1
   * define a new `main` because the `main` method is `final`.
   */
 abstract class hw(val courseName: String) extends Actions:
+  private[hwtest] var _args = Array.empty[String]
 
   /** The name of the the object inheriting from this class
     *
@@ -77,9 +78,10 @@ abstract class hw(val courseName: String) extends Actions:
     * the hwName would be "hw7".
     */
   private final val hwName =
-    // Finds the name of the homeework by inspecting the result of toString.
+    // Finds the name of the homework by inspecting the result of toString.
     // There is theoretically a vulnerability to somebody overriding
-    // the toString method inside the homework object, but that .
+    // the toString method inside the homework object, but that is extremely
+    // unlikely to happen by accident.
     val parts = this.toString().split("[.$]")
     val name = parts(parts.length-2)
     // because this name will be used as part of a url, limit what it can be
@@ -195,6 +197,10 @@ abstract class hw(val courseName: String) extends Actions:
 
     def url: String = s"$urlBase/$testFileName"
 
+    def fetchTest: Option[(String, String)] =
+      if _args.length == 2 && _args(0) == "TEST" then Some(("TEST", _args(1)))
+      else None
+
     def fetchLocal: Option[(String, String)] =
       fetch("local", readFromFile(testFileName))
 
@@ -205,7 +211,8 @@ abstract class hw(val courseName: String) extends Actions:
       fetch("cached", readFromFile(s".cache/$testFileName"))
 
     val (description, testData) =
-      fetchLocal
+      fetchTest
+        .orElse(fetchLocal)
         .orElse(fetchRemote)
         .orElse(fetchCached)
         .getOrElse {
@@ -232,6 +239,7 @@ abstract class hw(val courseName: String) extends Actions:
     */
   final def main(args: Array[String]): Unit =
     try
+      _args = args
       src // force the lazy val here, inside the try-catch
 
       runActions()
@@ -309,14 +317,14 @@ abstract class hw(val courseName: String) extends Actions:
               failureLimit: Int = defaultFailureLimit): Unit =
       if timeLimit != defaultTimeLimit then
         if timeLimit < minimumTimeLimit then
-          println(s"!!! Cannot set timeLimit below ${minimumTimeLimit}ms, setting to ${minimumTimeLimit}ms instead. !!!")
+          println(s"!!!!! Cannot set timeLimit below ${minimumTimeLimit}ms, setting to ${minimumTimeLimit}ms instead.")
           _timeLimit = minimumTimeLimit
         else
           _timeLimit = timeLimit
 
       if failureLimit != defaultFailureLimit then
         if failureLimit < minimumFailureLimit then
-          println(s"!!! Cannot set failureLimit below ${minimumFailureLimit}, setting to ${minimumFailureLimit} instead. !!!")
+          println(s"!!!!! Cannot set failureLimit below ${minimumFailureLimit}, setting to ${minimumFailureLimit} instead.")
           _failureLimit = minimumFailureLimit
         else
           _failureLimit = failureLimit
@@ -340,7 +348,7 @@ abstract class hw(val courseName: String) extends Actions:
    * Equivalence is checked using the `equiv` method of `TA`.
    */
   private def checkAnswer[A](expectedAnswer: A, receivedAnswer: A) (using TA: Testable[A]): Unit =
-    withClue(s"Expected answer ${TA.show(expectedAnswer)}\nReceived answer ${TA.show(receivedAnswer)}\n") {
+    withClue(s"${TA.label("Expected answer:",expectedAnswer)}${TA.label("Received answer:",receivedAnswer)}") {
       TA.checkInvariant(receivedAnswer)
       if !TA.equiv(expectedAnswer, receivedAnswer) then
         org.scalatest.Assertions.fail()
@@ -410,7 +418,7 @@ abstract class hw(val courseName: String) extends Actions:
     *
     * Returns a [[hwtest.ConfigurableTest]], like `test` does, so you can
     * switch freely between `test` and `ignoretest`.  However, `ignoretest`
-    * will ignore an such configuration.
+    * will ignore any such configuration.
     *
     * @param name the name to be displayed for the function being tested
     * @param f the function to test
@@ -512,6 +520,38 @@ abstract class hw(val courseName: String) extends Actions:
           val result = params.call(f)
           withClue(TR.label("Result",result)) { params.callV(validate, result) }        }
       }
+
+  /** Encapsulates debugging code.
+    *
+    * The intent of this library is that most debugging should be based on
+    * failed test cases, using the clues provided by the failure message.
+    * However, there can be times when you want to fall back in old-fashioned
+    * println debugging.
+    *
+    * Before doing so, first change any `test`/`testV` commands for the
+    * function you are debugging to `ignoretest`/`ignoreV`.
+    * Then, just above or below the `ignoretest`/`ignoreV` line, put
+    * ```
+    *   debug("some message") {
+    *     ...debugging code...
+    *   }
+    * ```
+    * Usually, the debugging code will call the function in question on
+    * some known input. You can also put `println`s inside the body of the
+    * function in question to trace what is happening internally. Those
+    * internal `println`s should *not* be wrapped in a `debug` command.
+    */
+  def debug(msg: String)(action: => Any): Unit =
+    registerAction {
+      println(s"!!!!! BEGIN DEBUGGING $msg")
+      action
+      println(s"!!!!! END DEBUGGING $msg")
+    }
+
+  def ignoredebug(msg: String)(action: => Any): Unit =
+    registerAction {
+      println(s"!!!!! IGNORE DEBUGGING $msg")
+    }
 
   //////////////////////////////////////////////////////////////////////
   // the ParamsN classes help reduce the boilerplate between the various
