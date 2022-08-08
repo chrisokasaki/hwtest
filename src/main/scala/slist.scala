@@ -62,7 +62,7 @@ package slist:
     given TestableSList: Testable[SList] with
       val name = "SList"
       val TI = Testable.TestableInt
-      def parse(src: Src) = pColl(pInt, _.foldRight(SList.empty)(_ :: _))(src)
+      def parse: Src => SList = pColl(pInt, _.foldRight(SList.empty)(_ :: _))
       override def lt(x: SList, y: SList): Boolean =
         var xp = x
         var yp = y

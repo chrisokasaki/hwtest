@@ -185,22 +185,9 @@ package mlist
       val TI = Testable.TestableInt
       override def equiv(x: MList, y: MList): Boolean = x.toString == y.toString
       override def lt(x: MList, y: MList): Boolean = x.toString < y.toString
-      override def copy(x: MList): MList =
-        if x.isEmpty then MList.empty
-        else
-          val front = x.head :: MList.empty
-          var rear = front
-          var list = x.tail
-          var copied = Map(x -> front) // used to detect a cycle
-          while list.nonEmpty && !copied.contains(list) do
-            rear.tail = list.head :: MList.empty
-            copied += (list -> rear)
-            rear = rear.tail
-            list = list.tail
-          if copied.contains(list) then rear.tail = copied(list)
-          front
+      override def copy(x: MList): MList = x.copy()
 
-      def parse(src: Src): MList =
+      def parse: Src => MList = src =>
         // format
         //   without cycle: (1 2 3)
         //      with cycle: (1 *2 3)
@@ -216,24 +203,21 @@ package mlist
         var back: MList = MNil
         var frontOfCycle: MList = MNil
 
-        while true do
-          src.skipWhite()
-          if src.head == ')' then
-            src.next()
-            if back != MNil then back.tail = frontOfCycle
-            return front
-          else
-            val cycleFlag = src.head == '*'
-            if cycleFlag then
-              src.next() // consume the *
-              if frontOfCycle.nonEmpty then
-                throw Exception("malformed test data -- more than one * in MList")
-            val node = MCons(pInt(src), MNil)
-            if front == MNil then front = node
-            if back != MNil then back.tail = node
-            back = node
-            if cycleFlag then frontOfCycle = node
-        ??? // can't ever get here
+        while {src.skipWhite(); src.head != ')'} do
+          val cycleFlag = src.head == '*'
+          if cycleFlag then
+            src.next() // discard the *
+            if frontOfCycle.nonEmpty then
+              parseError("malformed test data -- more than one * in MList")
+          val node = MCons(pInt(src), MNil)
+          if front == MNil then front = node
+          if back != MNil then back.tail = node
+          back = node
+          if cycleFlag then frontOfCycle = node
+        // found the ')'
+        src.next() // discard the ')'
+        if back != MNil then back.tail = frontOfCycle
+        front
 
   /** A "header" node for `MList`s.
     *
@@ -259,7 +243,7 @@ package mlist
     given TestableMHeader[A](using TA: Testable[A]): Testable[MHeader[A]] with
       val name = s"MHeader[${TA.name}]"
       val TML = MList.TestableMList
-      def parse(src: Src): MHeader[A] = MHeader(TA.parse(src), TML.parse(src))
+      def parse: Src => MHeader[A] = chain(TA.parse, TML.parse, MHeader(_, _))
       val TS = Testable.TestableString
       override def _show(x: MHeader[A]): String =
         val listString = x.front.toString().drop(6) // drop "MList("

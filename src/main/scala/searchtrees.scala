@@ -24,14 +24,12 @@ object SearchTree:
   given TestableSearchTree[A](using TA : Testable[A]): Testable[SearchTree[A]] =
     new Testable[SearchTree[A]]:
       val name = s"SearchTree[${TA.name}]"
-      def parse(src: Src): SearchTree[A] =
-        def pTree: Parser[SearchTree[A]] =
-          choose(
-            'E' -> const(Empty),
-            'L' -> chain(TA.parse, Node(Empty,_,Empty)),
-            'T' -> chain(pTree, TA.parse, pTree, Node(_,_,_))
-          )
-        pTree(src)
+      def parse: Src => SearchTree[A] =
+        choose(
+          'E' -> const(Empty),
+          'L' -> chain(TA.parse, Node(Empty,_,Empty)),
+          'T' -> chain(parse, TA.parse, parse, Node(_,_,_))
+        )
       override def _show(x: SearchTree[A]): String =
         def map(tree: SearchTree[A]): SearchTree[String] = tree match
           case Empty => Empty

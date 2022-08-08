@@ -17,6 +17,25 @@ $
 2 "dog" 'a' 20 22
 2 "dog" 'a' 20
 2 "dog" 'a' 20 23 # deliberately wrong answer to test error message
+$
+"aaa" 'f' T (6 5) N ('q' 'h')
+'f' "aaa"
+T 'f' "aaa"
+(6 5) T 'f' "aaa"
+N (6 5) T 'f' "aaa"
+('q' 'h') N (6 5) T 'f' "aaa"
+"fox" 'w' F (2 1 4 3) ST ('b' 'i' 'r' 'd')
+'w' "fox"
+F 'w' "fox"
+(2 1 4 3) F 'w' "fox"
+ST (2 1 4 3) F 'w' "fox"
+('b' 'i' 'r' 'd') ST (2 1 4 3) F 'w' "fox"
+"fox" 'w' F (2 1 4 3) ST ('b' 'i' 'r' 'd')
+'w' "fox"
+F 'w' "fox"
+(2 1 4 3) F 'w' "fox"
+ST (2 1 4 3) F 'w' "fox"
+('b' 'i' 'r' 'd') ST (2 1 4 3) F 'w' "hound" # deliberately wrong answer to test error message
 $""","""
 CS123: hwTuples (hwtest ###
 Margaret Hamilton
@@ -35,6 +54,13 @@ Test #3 *** FAILED ***
   tup = (2, "dog", 'a', 20)
   Expected answer: (2, "dog", 'a', 20, 23)
   Received answer: (2, "dog", 'a', 20, 22)
+Passed 2/3 tests in ###
+Begin testing checkMultipleSizes at ###
+..
+Test #3 *** FAILED ***
+  tup = ("fox", 'w', false, List(2, 1, 4, 3), Some(true), Array('b', 'i', 'r', 'd'))
+  Expected answer: (('w', "fox"), (false, 'w', "fox"), (List(2, 1, 4, 3), false, 'w', "fox"), (Some(true), List(2, 1, 4, 3), false, 'w', "fox"), (Array('b', 'i', 'r', 'd'), Some(true), List(2, 1, 4, 3), false, 'w', "hound"))
+  Received answer: (('w', "fox"), (false, 'w', "fox"), (List(2, 1, 4, 3), false, 'w', "fox"), (Some(true), List(2, 1, 4, 3), false, 'w', "fox"), (Array('b', 'i', 'r', 'd'), Some(true), List(2, 1, 4, 3), false, 'w', "fox"))
 Passed 2/3 tests in ###""")
   }
 
@@ -50,3 +76,13 @@ object hwTuples extends hwtest.hw("CS123"):
     val (a,b,c,d) = tup
     (a,b,c,d,a+d)
   test("extend", extend, "tup")
+
+  def checkMultipleSizes(tup: (String, Char, Boolean, List[Int], Option[Boolean], Array[Char])):
+        ( (Char, String),
+          (Boolean,Char,String),
+          (List[Int],Boolean,Char,String),
+          (Option[Boolean],List[Int],Boolean,Char,String),
+          (Array[Char],Option[Boolean],List[Int],Boolean,Char,String) ) =
+    val (a,b,c,d,e,f) = tup
+    ( (b,a),(c,b,a),(d,c,b,a),(e,d,c,b,a),(f,e,d,c,b,a) )
+  test("checkMultipleSizes", checkMultipleSizes, "tup")

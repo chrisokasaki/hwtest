@@ -13,13 +13,13 @@ trait Testable[A]:
     */
   def name: String
 
-  /** Returns a value of the indicated type read from the `src`.
+  /** Returns a function that reads a value of the indicated type from a given `src`.
     *
     * Abstract method that must be defined when instantiating a new `Testable`.
     * Will usually be defined using a function either predefined in
     * `hwtest.parser` or built from combinators provided by `hwtest.parser`.
     */
-  def parse(src: Src): A
+  def parse: Src => A
 
   /** Like `parse` but also checks that the parsed value satisfies any
     * invariant expected of a value of this type. Throws an exception
@@ -235,7 +235,7 @@ trait Testable[A]:
   *   * `Boolean`, `Char`, `String`
   *   * `Option`, `List`, `Array`
   *   * `Set`, `Map` (from `scala.collection.immutable`)
-  *   * `Tuple2`, ..., `Tuple4`
+  *   * `Tuple2`, ..., `Tuple6`
   *
   * Other types can be added as needed by declaring an appropriate
   * `Testable` instance.
@@ -247,224 +247,221 @@ object Testable:
 
   given TestableInt: Testable[Int] with
     val name = "Int"
-    def parse(src: Src): Int = pInt(src)
+    def parse: Src => Int = pInt
     override def lt(x: Int, y: Int): Boolean = x < y
 
   given TestableLong: Testable[Long] with
     val name = "Long"
-    def parse(src: Src): Long = pLong(src)
+    def parse: Src => Long = pLong
     override def lt(x: Long, y: Long): Boolean = x < y
 
   given TestableBigInt: Testable[BigInt] with
     val name = "BigInt"
-    def parse(src: Src): BigInt = pBigInt(src)
+    def parse: Src => BigInt = pBigInt
     override def lt(x: BigInt, y: BigInt): Boolean = x < y
 
   given TestableDouble: Testable[Double] with
     val name = "Double"
-    def parse(src: Src) = pDouble(src)
+    def parse: Src => Double = pDouble
     override def equiv(x: Double, y: Double) =
       (x-y).abs < 1e-8 || (y*(1.0-1e-10) < x) == (x < y*(1.0+1e-10))
     override def lt(x: Double, y: Double): Boolean = x < y // shady!
 
   given TestableBoolean: Testable[Boolean] with
     val name = "Boolean"
-    def parse(src: Src) = pBoolean(src)
+    def parse: Src => Boolean = pBoolean
     override def lt(x: Boolean, y: Boolean): Boolean = x < y
 
   given TestableChar: Testable[Char] with
     val name = "Char"
-    def parse(src: Src): Char = pChar(src)
+    def parse: Src => Char = pChar
     override def _show(x: Char): String = s"'$x'" // does NOT try to display escape sequences
     override def lt(x: Char, y: Char): Boolean = x < y
 
   given TestableString: Testable[String] with
     val name = "String"
-    def parse(src: Src): String = pString(src)
+    def parse: Src => String = pString
     override def _show(x: String): String =
       s""""$x"""" // does NOT try to display escape sequences
     override def lt(x: String, y: String): Boolean = x < y
 
-  given TestableOption[T](using TT: Testable[T]): Testable[Option[T]] with
-    val name = s"Option[${TT.name}]"
-    def parse(src: Src): Option[T] = pOption(TT.parse)(src)
-    override def _show(x: Option[T]): String = x.map(TT.show).toString
-    override def copy(x: Option[T]): Option[T] = x.map(TT.copy)
-    override def equiv(x: Option[T], y: Option[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
-    override def lt(x: Option[T], y: Option[T]): Boolean = multilt(x.iterator,y.iterator,TT)
-    override def checkInvariant(x: Option[T]): Unit =
-      x.foreach(TT.checkInvariant)
+  given TestableOption[A](using TA: Testable[A]): Testable[Option[A]] with
+    val name = s"Option[${TA.name}]"
+    def parse: Src => Option[A] = pOption(TA.parse)
+    override def _show(x: Option[A]): String = x.map(TA.show).toString
+    override def copy(x: Option[A]): Option[A] = x.map(TA.copy)
+    override def equiv(x: Option[A], y: Option[A]): Boolean = multiequiv(x.iterator,y.iterator,TA)
+    override def lt(x: Option[A], y: Option[A]): Boolean = multilt(x.iterator,y.iterator,TA)
+    override def checkInvariant(x: Option[A]): Unit =
+      x.foreach(TA.checkInvariant)
 
-  given TestableList[T](using TT: Testable[T]): Testable[List[T]] with
-    val name = s"List[${TT.name}]"
-    def parse(src: Src): List[T] = pList(TT.parse)(src)
-    override def _show(x: List[T]): String = x.map(TT.show).toString
-    override def copy(x: List[T]): List[T] = x.map(TT.copy)
-    override def equiv(x: List[T], y: List[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
-    override def lt(x: List[T], y: List[T]): Boolean = multilt(x.iterator,y.iterator,TT)
-    override def checkInvariant(x: List[T]): Unit =
-      x.foreach(TT.checkInvariant)
+  given TestableList[A](using TA: Testable[A]): Testable[List[A]] with
+    val name = s"List[${TA.name}]"
+    def parse: Src => List[A] = pList(TA.parse)
+    override def _show(x: List[A]): String = x.map(TA.show).toString
+    override def copy(x: List[A]): List[A] = x.map(TA.copy)
+    override def equiv(x: List[A], y: List[A]): Boolean = multiequiv(x.iterator,y.iterator,TA)
+    override def lt(x: List[A], y: List[A]): Boolean = multilt(x.iterator,y.iterator,TA)
+    override def checkInvariant(x: List[A]): Unit =
+      x.foreach(TA.checkInvariant)
 
-  given TestableArray[T : reflect.ClassTag](using TT: Testable[T]): Testable[Array[T]] with
-    val name = s"Array[${TT.name}]"
+  given TestableArray[A : reflect.ClassTag](using TA: Testable[A]): Testable[Array[A]] with
+    val name = s"Array[${TA.name}]"
 
-    def parse(src: Src): Array[T] =
-      val parser = pArray(TT.parse)
-      parser(src)
-    override def _show(x: Array[T]): String = x.map(TT.show).mkString("Array(",", ",")")
-    override def copy(x: Array[T]): Array[T] = x.map(TT.copy)
-    override def equiv(x: Array[T], y: Array[T]): Boolean = multiequiv(x.iterator,y.iterator,TT)
-    override def lt(x: Array[T], y: Array[T]): Boolean = multilt(x.iterator,y.iterator,TT)
-    override def checkInvariant(x: Array[T]): Unit =
-      x.foreach(TT.checkInvariant)
+    def parse: Src => Array[A] = pArray(TA.parse)
+    override def _show(x: Array[A]): String = x.map(TA.show).mkString("Array(",", ",")")
+    override def copy(x: Array[A]): Array[A] = x.map(TA.copy)
+    override def equiv(x: Array[A], y: Array[A]): Boolean = multiequiv(x.iterator,y.iterator,TA)
+    override def lt(x: Array[A], y: Array[A]): Boolean = multilt(x.iterator,y.iterator,TA)
+    override def checkInvariant(x: Array[A]): Unit =
+      x.foreach(TA.checkInvariant)
 
-  given TestableSet[T](using TT: Testable[T]): Testable[Set[T]] with
-    val name = s"Set[${TT.name}]"
-    def parse(src: Src): Set[T] = pSet(TT.parse)(src)
+  given TestableSet[A](using TA: Testable[A]): Testable[Set[A]] with
+    val name = s"Set[${TA.name}]"
+    def parse: Src => Set[A] = pSet(TA.parse)
 
-    def norm(x: Set[T]): Iterator[T] = x.toList.sortWith(TT.lt).iterator // stable sort!
-    override def _show(x: Set[T]): String = norm(x).mkString("Set(",", ",")")
-    override def copy(x: Set[T]): Set[T] = x.map(TT.copy)
-    override def equiv(x: Set[T], y: Set[T]): Boolean = multiequiv(norm(x), norm(y), TT)
-    override def lt(x: Set[T], y: Set[T]): Boolean = multilt(norm(x), norm(y), TT)
-    override def checkInvariant(x: Set[T]): Unit =
-      x.foreach(TT.checkInvariant)
+    def norm(x: Set[A]): Iterator[A] = x.toList.sortWith(TA.lt).iterator // stable sort!
+    override def _show(x: Set[A]): String = norm(x).mkString("Set(",", ",")")
+    override def copy(x: Set[A]): Set[A] = x.map(TA.copy)
+    override def equiv(x: Set[A], y: Set[A]): Boolean = multiequiv(norm(x), norm(y), TA)
+    override def lt(x: Set[A], y: Set[A]): Boolean = multilt(norm(x), norm(y), TA)
+    override def checkInvariant(x: Set[A]): Unit =
+      x.foreach(TA.checkInvariant)
 
-  given TestableMap[T1,T2](using TT1: Testable[T1], TT2: Testable[T2]): Testable[Map[T1,T2]] with
-    val Pair = TestableTuple2[T1,T2]
+  given TestableMap[K,V](using TK: Testable[K], TV: Testable[V]): Testable[Map[K,V]] with
+    val Pair = TestableTuple2[K,V]
 
-    val name = s"Map[${TT1.name}, ${TT2.name}]"
-    def parse(src: Src): Map[T1,T2] = pMap(TT1.parse, TT2.parse)(src)
-
-    def norm(x: Map[T1,T2]) = x.toList.sortWith(Pair.lt).iterator // stable sort!
-    override def _show(x: Map[T1,T2]) =
-      norm(x).map(p => TT1.show(p._1) + " -> " + TT2.show(p._2)).mkString("Map(",", ",")")
-    override def copy(x: Map[T1,T2]) = x.toList.map(Pair.copy).toMap
-    override def equiv(x: Map[T1,T2], y: Map[T1,T2]): Boolean = multiequiv(norm(x),norm(y),Pair)
-    override def lt(x: Map[T1,T2], y: Map[T1,T2]): Boolean = multilt(norm(x),norm(y),Pair)
-    override def checkInvariant(x: Map[T1,T2]): Unit =
+    val name = s"Map[${TK.name}, ${TV.name}]"
+    def parse: Src => Map[K,V] = pMap(TK.parse, TV.parse)
+    def norm(x: Map[K,V]) = x.toList.sortWith(Pair.lt).iterator // stable sort!
+    override def _show(x: Map[K,V]) =
+      norm(x).map(p => TK.show(p._1) + " -> " + TV.show(p._2)).mkString("Map(",", ",")")
+    override def copy(x: Map[K,V]) = x.toList.map(Pair.copy).toMap
+    override def equiv(x: Map[K,V], y: Map[K,V]): Boolean = multiequiv(norm(x),norm(y),Pair)
+    override def lt(x: Map[K,V], y: Map[K,V]): Boolean = multilt(norm(x),norm(y),Pair)
+    override def checkInvariant(x: Map[K,V]): Unit =
       for (k,v) <- x do
-        TT1.checkInvariant(k)
-        TT2.checkInvariant(v)
+        TK.checkInvariant(k)
+        TV.checkInvariant(v)
 
-  given TestableTuple2[T1,T2](using TT1: Testable[T1], TT2: Testable[T2]): Testable[Tuple2[T1,T2]] with
-    val name = s"Tuple2[${TT1.name}, ${TT2.name}]"
-    def parse(src: Src): Tuple2[T1,T2] = pTuple(TT1.parse, TT2.parse)(src)
-    override def _show(x: Tuple2[T1,T2]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)})"
-    override def copy(x: Tuple2[T1,T2]): Tuple2[T1,T2] =
-      (TT1.copy(x._1), TT2.copy(x._2))
-    override def equiv(x: Tuple2[T1,T2], y: Tuple2[T1,T2]): Boolean =
-      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2)
-    override def lt(x: Tuple2[T1,T2], y: Tuple2[T1,T2]): Boolean =
-      if TT1.lt(x._1,y._1) then true
-      else if TT1.lt(y._1,x._1) then false
-      else TT2.lt(x._2,y._2)
-    override def checkInvariant(x: Tuple2[T1,T2]): Unit =
-      TT1.checkInvariant(x._1)
-      TT2.checkInvariant(x._2)
+  given TestableTuple2[A,B](using TA: Testable[A], TB: Testable[B]): Testable[Tuple2[A,B]] with
+    val name = s"Tuple2[${TA.name}, ${TB.name}]"
+    def parse: Src => Tuple2[A,B] = pTuple(TA.parse, TB.parse)
+    override def _show(x: Tuple2[A,B]): String =
+      s"(${TA.show(x._1)}, ${TB.show(x._2)})"
+    override def copy(x: Tuple2[A,B]): Tuple2[A,B] =
+      (TA.copy(x._1), TB.copy(x._2))
+    override def equiv(x: Tuple2[A,B], y: Tuple2[A,B]): Boolean =
+      TA.equiv(x._1,y._1) && TB.equiv(x._2,y._2)
+    override def lt(x: Tuple2[A,B], y: Tuple2[A,B]): Boolean =
+      if TA.lt(x._1,y._1) then true
+      else if TA.lt(y._1,x._1) then false
+      else TB.lt(x._2,y._2)
+    override def checkInvariant(x: Tuple2[A,B]): Unit =
+      TA.checkInvariant(x._1)
+      TB.checkInvariant(x._2)
 
-  given TestableTuple3[T1,T2,T3](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3]): Testable[Tuple3[T1,T2,T3]] with
-    val name = s"Tuple3[${TT1.name}, ${TT2.name}, ${TT3.name}]"
-    def parse(src: Src): Tuple3[T1,T2,T3] =
-      pTuple(TT1.parse,TT2.parse,TT3.parse)(src)
-    override def _show(x: Tuple3[T1,T2,T3]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)})"
-    override def copy(x: Tuple3[T1,T2,T3]): Tuple3[T1,T2,T3] =
-      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3))
-    override def equiv(x: Tuple3[T1,T2,T3], y: Tuple3[T1,T2,T3]): Boolean =
-      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3)
-    override def lt(x: Tuple3[T1,T2,T3], y: Tuple3[T1,T2,T3]): Boolean =
-      if TT1.lt(x._1,y._1) then true
-      else if TT1.lt(y._1,x._1) then false
-      else if TT2.lt(x._2,y._2) then true
-      else if TT2.lt(y._2,x._2) then false
-      else TT3.lt(x._3,y._3)
-    override def checkInvariant(x: Tuple3[T1,T2,T3]): Unit =
-      TT1.checkInvariant(x._1)
-      TT2.checkInvariant(x._2)
-      TT3.checkInvariant(x._3)
+  given TestableTuple3[A,B,C](using TA: Testable[A], TB: Testable[B], TC: Testable[C]): Testable[Tuple3[A,B,C]] with
+    val name = s"Tuple3[${TA.name}, ${TB.name}, ${TC.name}]"
+    def parse: Src => Tuple3[A,B,C] =
+      pTuple(TA.parse,TB.parse,TC.parse)
+    override def _show(x: Tuple3[A,B,C]): String =
+      s"(${TA.show(x._1)}, ${TB.show(x._2)}, ${TC.show(x._3)})"
+    override def copy(x: Tuple3[A,B,C]): Tuple3[A,B,C] =
+      (TA.copy(x._1), TB.copy(x._2), TC.copy(x._3))
+    override def equiv(x: Tuple3[A,B,C], y: Tuple3[A,B,C]): Boolean =
+      TA.equiv(x._1,y._1) && TB.equiv(x._2,y._2) && TC.equiv(x._3,y._3)
+    override def lt(x: Tuple3[A,B,C], y: Tuple3[A,B,C]): Boolean =
+      if TA.lt(x._1,y._1) then true
+      else if TA.lt(y._1,x._1) then false
+      else if TB.lt(x._2,y._2) then true
+      else if TB.lt(y._2,x._2) then false
+      else TC.lt(x._3,y._3)
+    override def checkInvariant(x: Tuple3[A,B,C]): Unit =
+      TA.checkInvariant(x._1)
+      TB.checkInvariant(x._2)
+      TC.checkInvariant(x._3)
 
-  given TestableTuple4[T1,T2,T3,T4](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4]): Testable[Tuple4[T1,T2,T3,T4]] with
-    val name = s"Tuple4[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}]"
-    def parse(src: Src): Tuple4[T1,T2,T3,T4] =
-      pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse)(src)
-    override def _show(x: Tuple4[T1,T2,T3,T4]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)})"
-    override def copy(x: Tuple4[T1,T2,T3,T4]): Tuple4[T1,T2,T3,T4] =
-      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4))
-    override def equiv(x: Tuple4[T1,T2,T3,T4], y: Tuple4[T1,T2,T3,T4]): Boolean =
-      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3) && TT4.equiv(x._4,y._4)
-    override def lt(x: Tuple4[T1,T2,T3,T4], y: Tuple4[T1,T2,T3,T4]): Boolean =
-      if TT1.lt(x._1,y._1) then true
-      else if TT1.lt(y._1,x._1) then false
-      else if TT2.lt(x._2,y._2) then true
-      else if TT2.lt(y._2,x._2) then false
-      else if TT3.lt(x._3,y._3) then true
-      else if TT3.lt(y._3,x._3) then false
-      else TT4.lt(x._4,y._4)
-    override def checkInvariant(x: Tuple4[T1,T2,T3,T4]): Unit =
-      TT1.checkInvariant(x._1)
-      TT2.checkInvariant(x._2)
-      TT3.checkInvariant(x._3)
-      TT4.checkInvariant(x._4)
+  given TestableTuple4[A,B,C,D](using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D]): Testable[Tuple4[A,B,C,D]] with
+    val name = s"Tuple4[${TA.name}, ${TB.name}, ${TC.name}, ${TD.name}]"
+    def parse: Src => Tuple4[A,B,C,D] =
+      pTuple(TA.parse,TB.parse,TC.parse,TD.parse)
+    override def _show(x: Tuple4[A,B,C,D]): String =
+      s"(${TA.show(x._1)}, ${TB.show(x._2)}, ${TC.show(x._3)}, ${TD.show(x._4)})"
+    override def copy(x: Tuple4[A,B,C,D]): Tuple4[A,B,C,D] =
+      (TA.copy(x._1), TB.copy(x._2), TC.copy(x._3), TD.copy(x._4))
+    override def equiv(x: Tuple4[A,B,C,D], y: Tuple4[A,B,C,D]): Boolean =
+      TA.equiv(x._1,y._1) && TB.equiv(x._2,y._2) && TC.equiv(x._3,y._3) && TD.equiv(x._4,y._4)
+    override def lt(x: Tuple4[A,B,C,D], y: Tuple4[A,B,C,D]): Boolean =
+      if TA.lt(x._1,y._1) then true
+      else if TA.lt(y._1,x._1) then false
+      else if TB.lt(x._2,y._2) then true
+      else if TB.lt(y._2,x._2) then false
+      else if TC.lt(x._3,y._3) then true
+      else if TC.lt(y._3,x._3) then false
+      else TD.lt(x._4,y._4)
+    override def checkInvariant(x: Tuple4[A,B,C,D]): Unit =
+      TA.checkInvariant(x._1)
+      TB.checkInvariant(x._2)
+      TC.checkInvariant(x._3)
+      TD.checkInvariant(x._4)
 
-  given TestableTuple5[T1,T2,T3,T4,T5](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5]): Testable[Tuple5[T1,T2,T3,T4,T5]] with
-    val name = s"Tuple5[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}, ${TT5.name}]"
-    def parse(src: Src): Tuple5[T1,T2,T3,T4,T5] =
-      pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse)(src)
-    override def _show(x: Tuple5[T1,T2,T3,T4,T5]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)}, ${TT5.show(x._5)})"
-    override def copy(x: Tuple5[T1,T2,T3,T4,T5]): Tuple5[T1,T2,T3,T4,T5] =
-      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5))
-    override def equiv(x: Tuple5[T1,T2,T3,T4,T5], y: Tuple5[T1,T2,T3,T4,T5]): Boolean =
-      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3) && TT4.equiv(x._4,y._4) && TT5.equiv(x._5,y._5)
-    override def lt(x: Tuple5[T1,T2,T3,T4,T5], y: Tuple5[T1,T2,T3,T4,T5]): Boolean =
-      if TT1.lt(x._1,y._1) then true
-      else if TT1.lt(y._1,x._1) then false
-      else if TT2.lt(x._2,y._2) then true
-      else if TT2.lt(y._2,x._2) then false
-      else if TT3.lt(x._3,y._3) then true
-      else if TT3.lt(y._3,x._3) then false
-      else if TT4.lt(x._4,y._4) then true
-      else if TT4.lt(y._4,x._4) then false
-      else TT5.lt(x._5,y._5)
-    override def checkInvariant(x: Tuple5[T1,T2,T3,T4,T5]): Unit =
-      TT1.checkInvariant(x._1)
-      TT2.checkInvariant(x._2)
-      TT3.checkInvariant(x._3)
-      TT4.checkInvariant(x._4)
-      TT5.checkInvariant(x._5)
+  given TestableTuple5[A,B,C,D,E](using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E]): Testable[Tuple5[A,B,C,D,E]] with
+    val name = s"Tuple5[${TA.name}, ${TB.name}, ${TC.name}, ${TD.name}, ${TE.name}]"
+    def parse: Src => Tuple5[A,B,C,D,E] =
+      pTuple(TA.parse,TB.parse,TC.parse,TD.parse,TE.parse)
+    override def _show(x: Tuple5[A,B,C,D,E]): String =
+      s"(${TA.show(x._1)}, ${TB.show(x._2)}, ${TC.show(x._3)}, ${TD.show(x._4)}, ${TE.show(x._5)})"
+    override def copy(x: Tuple5[A,B,C,D,E]): Tuple5[A,B,C,D,E] =
+      (TA.copy(x._1), TB.copy(x._2), TC.copy(x._3), TD.copy(x._4), TE.copy(x._5))
+    override def equiv(x: Tuple5[A,B,C,D,E], y: Tuple5[A,B,C,D,E]): Boolean =
+      TA.equiv(x._1,y._1) && TB.equiv(x._2,y._2) && TC.equiv(x._3,y._3) && TD.equiv(x._4,y._4) && TE.equiv(x._5,y._5)
+    override def lt(x: Tuple5[A,B,C,D,E], y: Tuple5[A,B,C,D,E]): Boolean =
+      if TA.lt(x._1,y._1) then true
+      else if TA.lt(y._1,x._1) then false
+      else if TB.lt(x._2,y._2) then true
+      else if TB.lt(y._2,x._2) then false
+      else if TC.lt(x._3,y._3) then true
+      else if TC.lt(y._3,x._3) then false
+      else if TD.lt(x._4,y._4) then true
+      else if TD.lt(y._4,x._4) then false
+      else TE.lt(x._5,y._5)
+    override def checkInvariant(x: Tuple5[A,B,C,D,E]): Unit =
+      TA.checkInvariant(x._1)
+      TB.checkInvariant(x._2)
+      TC.checkInvariant(x._3)
+      TD.checkInvariant(x._4)
+      TE.checkInvariant(x._5)
 
-  given TestableTuple6[T1,T2,T3,T4,T5,T6](using TT1: Testable[T1], TT2: Testable[T2], TT3: Testable[T3], TT4: Testable[T4], TT5: Testable[T5], TT6: Testable[T6]): Testable[Tuple6[T1,T2,T3,T4,T5,T6]] with
-    val name = s"Tuple6[${TT1.name}, ${TT2.name}, ${TT3.name}, ${TT4.name}, ${TT5.name}, ${TT6.name}]"
-    def parse(src: Src): Tuple6[T1,T2,T3,T4,T5,T6] =
-      pTuple(TT1.parse,TT2.parse,TT3.parse,TT4.parse,TT5.parse,TT6.parse)(src)
-    override def _show(x: Tuple6[T1,T2,T3,T4,T5,T6]): String =
-      s"(${TT1.show(x._1)}, ${TT2.show(x._2)}, ${TT3.show(x._3)}, ${TT4.show(x._4)}, ${TT5.show(x._5)}, ${TT6.show(x._6)})"
-    override def copy(x: Tuple6[T1,T2,T3,T4,T5,T6]): Tuple6[T1,T2,T3,T4,T5,T6] =
-      (TT1.copy(x._1), TT2.copy(x._2), TT3.copy(x._3), TT4.copy(x._4), TT5.copy(x._5), TT6.copy(x._6))
-    override def equiv(x: Tuple6[T1,T2,T3,T4,T5,T6], y: Tuple6[T1,T2,T3,T4,T5,T6]): Boolean =
-      TT1.equiv(x._1,y._1) && TT2.equiv(x._2,y._2) && TT3.equiv(x._3,y._3) && TT4.equiv(x._4,y._4) && TT5.equiv(x._5,y._5) && TT6.equiv(x._6,y._6)
-    override def lt(x: Tuple6[T1,T2,T3,T4,T5,T6], y: Tuple6[T1,T2,T3,T4,T5,T6]): Boolean =
-      if TT1.lt(x._1,y._1) then true
-      else if TT1.lt(y._1,x._1) then false
-      else if TT2.lt(x._2,y._2) then true
-      else if TT2.lt(y._2,x._2) then false
-      else if TT3.lt(x._3,y._3) then true
-      else if TT3.lt(y._3,x._3) then false
-      else if TT4.lt(x._4,y._4) then true
-      else if TT4.lt(y._4,x._4) then false
-      else if TT5.lt(x._5,y._5) then true
-      else if TT5.lt(y._5,x._5) then false
-      else TT6.lt(x._6,y._6)
-    override def checkInvariant(x: Tuple6[T1,T2,T3,T4,T5,T6]): Unit =
-      TT1.checkInvariant(x._1)
-      TT2.checkInvariant(x._2)
-      TT3.checkInvariant(x._3)
-      TT4.checkInvariant(x._4)
-      TT5.checkInvariant(x._5)
-      TT6.checkInvariant(x._6)
+  given TestableTuple6[A,B,C,D,E,F](using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TF: Testable[F]): Testable[Tuple6[A,B,C,D,E,F]] with
+    val name = s"Tuple6[${TA.name}, ${TB.name}, ${TC.name}, ${TD.name}, ${TE.name}, ${TF.name}]"
+    def parse: Src => Tuple6[A,B,C,D,E,F] =
+      pTuple(TA.parse,TB.parse,TC.parse,TD.parse,TE.parse,TF.parse)
+    override def _show(x: Tuple6[A,B,C,D,E,F]): String =
+      s"(${TA.show(x._1)}, ${TB.show(x._2)}, ${TC.show(x._3)}, ${TD.show(x._4)}, ${TE.show(x._5)}, ${TF.show(x._6)})"
+    override def copy(x: Tuple6[A,B,C,D,E,F]): Tuple6[A,B,C,D,E,F] =
+      (TA.copy(x._1), TB.copy(x._2), TC.copy(x._3), TD.copy(x._4), TE.copy(x._5), TF.copy(x._6))
+    override def equiv(x: Tuple6[A,B,C,D,E,F], y: Tuple6[A,B,C,D,E,F]): Boolean =
+      TA.equiv(x._1,y._1) && TB.equiv(x._2,y._2) && TC.equiv(x._3,y._3) && TD.equiv(x._4,y._4) && TE.equiv(x._5,y._5) && TF.equiv(x._6,y._6)
+    override def lt(x: Tuple6[A,B,C,D,E,F], y: Tuple6[A,B,C,D,E,F]): Boolean =
+      if TA.lt(x._1,y._1) then true
+      else if TA.lt(y._1,x._1) then false
+      else if TB.lt(x._2,y._2) then true
+      else if TB.lt(y._2,x._2) then false
+      else if TC.lt(x._3,y._3) then true
+      else if TC.lt(y._3,x._3) then false
+      else if TD.lt(x._4,y._4) then true
+      else if TD.lt(y._4,x._4) then false
+      else if TE.lt(x._5,y._5) then true
+      else if TE.lt(y._5,x._5) then false
+      else TF.lt(x._6,y._6)
+    override def checkInvariant(x: Tuple6[A,B,C,D,E,F]): Unit =
+      TA.checkInvariant(x._1)
+      TB.checkInvariant(x._2)
+      TC.checkInvariant(x._3)
+      TD.checkInvariant(x._4)
+      TE.checkInvariant(x._5)
+      TF.checkInvariant(x._6)
 
 
   /** Provides an easier-to-read display for two-dimensional arrays by
@@ -491,7 +488,7 @@ object Testable:
     *
     * **Warning:** Best used with grids that are small enough not to wrap.
     *
-    * To use this as a replacement for `Testable[Array[Array[T]]]`, precede the
+    * To use this as a replacement for `Testable[Array[Array[A]]]`, precede the
     * `test` with a `given`, as in
     * ```
     *   given hwtest.Testable[Array[Array[Int]]] = hwtest.Testable.TestableGrid[Int]
@@ -501,26 +498,26 @@ object Testable:
     * an `Array[Array[Int]`. If necessary, you can avoid that by surounding the
     * `given...` and `test...` with `{` and `}`.
     */
-  def TestableGrid[T: reflect.ClassTag](using T: Testable[T]): Testable[Array[Array[T]]] = new Testable[Array[Array[T]]]:
-    // do everything the same as AAT except format
-    val AAT = TestableArray[Array[T]]
-    val name = AAT.name
-    def parse(src: Src): Array[Array[T]] = AAT.parse(src)
-    override def copy(x: Array[Array[T]]) = AAT.copy(x)
-    override def equiv(x: Array[Array[T]], y: Array[Array[T]]) = AAT.equiv(x,y)
-    override def lt(x: Array[Array[T]], y: Array[Array[T]]) = AAT.lt(x,y)
+  def TestableGrid[A: reflect.ClassTag](using TA: Testable[A]): Testable[Array[Array[A]]] = new Testable[Array[Array[A]]]:
+    // do everything the same as regular Testable[Array[Array[A]]] except format
+    val TAAA = TestableArray[Array[A]]
+    val name = TAAA.name
+    def parse: Src => Array[Array[A]] = TAAA.parse
+    override def copy(x: Array[Array[A]]) = TAAA.copy(x)
+    override def equiv(x: Array[Array[A]], y: Array[Array[A]]) = TAAA.equiv(x,y)
+    override def lt(x: Array[Array[A]], y: Array[Array[A]]) = TAAA.lt(x,y)
 
     // note that checkInvariant does NOT check that the grid is rectangular
-    override def checkInvariant(x: Array[Array[T]]): Unit = { AAT.checkInvariant(x) }
+    override def checkInvariant(x: Array[Array[A]]): Unit = { TAAA.checkInvariant(x) }
 
     // _format pads elements to make each column line up nicely
-    override def _format(g: Array[Array[T]]): String =
-      if g == null || g.isEmpty || g.exists(_ == null) then return AAT.show(g)
+    override def _format(g: Array[Array[A]]): String =
+      if g == null || g.isEmpty || g.exists(_ == null) then return TAAA.show(g)
       val numColumns = g(0).length
       // bail out to default if grid is not rectangular
-      if g.exists(_.length != numColumns) then return AAT.show(g)
+      if g.exists(_.length != numColumns) then return TAAA.show(g)
 
-      val strs = g.map(_.map(T.show))
+      val strs = g.map(_.map(TA.show))
       for col <- 0 until numColumns do
         val maxLen = strs.map(_.apply(col).length).max
         def pad(s: String) = List.fill(maxLen-s.length)(' ').mkString + s

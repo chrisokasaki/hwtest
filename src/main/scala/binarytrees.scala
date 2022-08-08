@@ -28,14 +28,12 @@ object BinaryTree:
   given TestableBinaryTree[A](using TA : Testable[A]): Testable[BinaryTree[A]] =
     new Testable[BinaryTree[A]]:
       val name = s"BinaryTree[${TA.name}]"
-      def parse(src: Src): BinaryTree[A] =
-        def pTree: Parser[BinaryTree[A]] =
-          choose(
-            'E' -> const(Empty),
-            'L' -> chain(TA.parse, Node(_,Empty,Empty)),
-            'T' -> chain(TA.parse, pTree, pTree, Node(_,_,_))
-          )
-        pTree(src)
+      def parse: Src => BinaryTree[A] =
+        choose(
+          'E' -> const(Empty),
+          'L' -> chain(TA.parse, Node(_,Empty,Empty)),
+          'T' -> chain(TA.parse, parse, parse, Node(_,_,_))
+        )
       override def equiv(x: BinaryTree[A], y: BinaryTree[A]): Boolean =
         (x,y) match
           case (Empty, Empty) => true

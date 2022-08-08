@@ -59,7 +59,7 @@ val minimumFailureLimit = 1
   *
   * The code for a typical homework will begin
   * ```
-  *   object hw7 extends hw("CS123"):
+  *   object hw7 extends hwtest.hw("CS123"):
   *     ...
   * ```
   * The `hw` class defines a `main` method that runs all the tests,
@@ -67,6 +67,9 @@ val minimumFailureLimit = 1
   * define a new `main` because the `main` method is `final`.
   */
 abstract class hw(val courseName: String) extends Actions:
+  // use ScalaTest's assert instead of Scala's default assert
+  export org.scalatest.Assertions.assert
+
   private[hwtest] var _args = Array.empty[String]
 
   /** The name of the the object inheriting from this class
@@ -407,6 +410,45 @@ abstract class hw(val courseName: String) extends Actions:
         }
       }
 
+  /** Like `test[A,R]` but for four-parameter functions. */
+  def test[A,B,C,D,R]
+        (name: String, f: (A,B,C,D) => R, param1: String, param2: String, param3: String, param4: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params4(TA,TB,TC,TD)
+        val expected = TR.parseAndCheck(src)
+        suite.testCase(params.label(param1,param2,param3,param4)) {
+          checkAnswer(expected, params.call(f))
+        }
+      }
+
+  /** Like `test[A,R]` but for five-parameter functions. */
+  def test[A,B,C,D,E,R]
+        (name: String, f: (A,B,C,D,E) => R, param1: String, param2: String, param3: String, param4: String, param5: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params5(TA,TB,TC,TD,TE)
+        val expected = TR.parseAndCheck(src)
+        suite.testCase(params.label(param1,param2,param3,param4,param5)) {
+          checkAnswer(expected, params.call(f))
+        }
+      }
+
+  /** Like `test[A,R]` but for six-parameter functions. */
+  def test[A,B,C,D,E,F,R]
+        (name: String, f: (A,B,C,D,E,F) => R, param1: String, param2: String, param3: String, param4: String, param5: String, param6: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TF: Testable[F], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params6(TA,TB,TC,TD,TE,TF)
+        val expected = TR.parseAndCheck(src)
+        suite.testCase(params.label(param1,param2,param3,param4,param5,param6)) {
+          checkAnswer(expected, params.call(f))
+        }
+      }
+
   /** Skips this test.
     *
     * Never comment-out or delete a `test` command. Among other things,
@@ -459,6 +501,42 @@ abstract class hw(val courseName: String) extends Actions:
           TR.parseAndCheck(src)
       }
 
+  /** Like `ignoretest[A,R]` but for four-parameter functions. */
+  def ignoretest[A,B,C,D,R]
+        (name: String, f: (A,B,C,D) => R, param1: String, param2: String, param3: String, param4: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params4(TA,TB,TC,TD)
+          TR.parseAndCheck(src)
+      }
+
+  /** Like `ignoretest[A,R]` but for five-parameter functions. */
+  def ignoretest[A,B,C,D,E,R]
+        (name: String, f: (A,B,C,D,E) => R, param1: String, param2: String, param3: String, param4: String, param5: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params5(TA,TB,TC,TD,TE)
+          TR.parseAndCheck(src)
+      }
+
+  /** Like `ignoretest[A,R]` but for six-parameter functions. */
+  def ignoretest[A,B,C,D,E,F,R]
+        (name: String, f: (A,B,C,D,E,F) => R, param1: String, param2: String, param3: String, param4: String, param5: String, param6: String)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TF: Testable[F], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params6(TA,TB,TC,TD,TE,TF)
+          TR.parseAndCheck(src)
+      }
+
   /** Tests a one-parameter function for which more than one
     * result could be considered correct.
     *
@@ -466,6 +544,11 @@ abstract class hw(val courseName: String) extends Actions:
     * check if the result is acceptable. The `validate` function
     * should return unit when the result is acceptable and
     * throw an exception when the result is **not** acceptable.
+    *
+    * Often, the most convenient way to express your `validate` function
+    * is using one or more `assert`s.  (Note that when you call `assert`
+    * inside a `testV`, you are actually calling an `assert` from
+    * [[org.scalatest.Assertions]] rather than from [[scala.Predef]].)
     *
     * If there is a unique result of the function that should be considered
     * correct, it is usually more convenient to use `test` instead of `testV`.
@@ -521,11 +604,129 @@ abstract class hw(val courseName: String) extends Actions:
           withClue(TR.label("Result",result)) { params.callV(validate, result) }        }
       }
 
+  /** Like `testV[A,R]` but for four-parameter functions. */
+  def testV[A,B,C,D,R](name: String, f: (A,B,C,D) => R, param1: String, param2: String, param3: String, param4: String)
+        (validate: (A,B,C,D,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params4(TA,TB,TC,TD)
+        suite.testCase(params.label(param1,param2,param3,param4)) {
+          val result = params.call(f)
+          withClue(TR.label("Result",result)) { params.callV(validate, result) }        }
+      }
+
+  /** Like `testV[A,R]` but for five-parameter functions. */
+  def testV[A,B,C,D,E,R](name: String, f: (A,B,C,D,E) => R, param1: String, param2: String, param3: String, param4: String, param5: String)
+        (validate: (A,B,C,D,E,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params5(TA,TB,TC,TD,TE)
+        suite.testCase(params.label(param1,param2,param3,param4,param5)) {
+          val result = params.call(f)
+          withClue(TR.label("Result",result)) { params.callV(validate, result) }        }
+      }
+
+  /** Like `testV[A,R]` but for six-parameter functions. */
+  def testV[A,B,C,D,E,F,R](name: String, f: (A,B,C,D,E,F) => R, param1: String, param2: String, param3: String, param4: String, param5: String, param6: String)
+        (validate: (A,B,C,D,E,F,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TF: Testable[F], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerTest {
+        val params = Params6(TA,TB,TC,TD,TE,TF)
+        suite.testCase(params.label(param1,param2,param3,param4,param5,param6)) {
+          val result = params.call(f)
+          withClue(TR.label("Result",result)) { params.callV(validate, result) }        }
+      }
+
+  /** Skips this testV.
+    *
+    * Never comment-out or delete a `testV` command. Among other things,
+    * this would cause the tests and the test data to become out of sync.
+    *
+    * Instead, if you don't want a `testV` to run for some reason, change it
+    * to `ignoretestV`, which will prevent the test from running but still
+    * keep the test data in sync.
+    *
+    * Returns a [[hwtest.ConfigurableTest]], like `testV` does, so you can
+    * switch freely between `testV` and `ignoretestV`.  However, `ignoretestV`
+    * will ignore any such configuration.
+    *
+    * @param name the name to be displayed for the function being tested
+    * @param f the function to test
+    * @param param1 the name of the function's parameter
+    */
+  def ignoretestV[A,R](name: String, f: A => R, param1: String)
+        (validate: (A,R) => Unit)
+        (using TA: Testable[A], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params1(TA)
+      }
+
+  /** Like `ignoretestV[A,R]` but for two-parameter functions. */
+  def ignoretestV[A,B,R](name: String, f: (A,B) => R, param1: String, param2: String)
+        (validate: (A,B,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params2(TA, TB)
+      }
+
+  /** Like `ignoretestV[A,R]` but for three-parameter functions. */
+  def ignoretestV[A,B,C,R](name: String, f: (A,B,C) => R, param1: String, param2: String, param3: String)
+        (validate: (A,B,C,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params3(TA, TB, TC)
+      }
+
+  /** Like `ignoretestV[A,R]` but for four-parameter functions. */
+  def ignoretestV[A,B,C,D,R](name: String, f: (A,B,C,D) => R, param1: String, param2: String, param3: String, param4: String)
+        (validate: (A,B,C,D,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params4(TA, TB, TC, TD)
+      }
+
+  /** Like `ignoretestV[A,R]` but for five-parameter functions. */
+  def ignoretestV[A,B,C,D,E,R](name: String, f: (A,B,C,D,E) => R, param1: String, param2: String, param3: String, param4: String, param5: String)
+        (validate: (A,B,C,D,E,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params5(TA, TB, TC, TD, TE)
+      }
+
+  /** Like `ignoretestV[A,R]` but for six-parameter functions. */
+  def ignoretestV[A,B,C,D,E,F,R](name: String, f: (A,B,C,D,E,F) => R, param1: String, param2: String, param3: String, param4: String, param5: String, param6: String)
+        (validate: (A,B,C,D,E,F,R) => Unit)
+        (using TA: Testable[A], TB: Testable[B], TC: Testable[C], TD: Testable[D], TE: Testable[E], TF: Testable[F], TR: Testable[R]): ConfigurableTest =
+    new ConfigurableTest(name):
+      registerAction {
+        println(s"***** Ignoring tests for $name.")
+        while !src.endOfTest() do
+          val params = Params6(TA, TB, TC, TD, TE, TF)
+      }
+
   /** Encapsulates debugging code.
     *
     * The intent of this library is that most debugging should be based on
     * failed test cases, using the clues provided by the failure message.
-    * However, there can be times when you want to fall back in old-fashioned
+    * However, there can be times when you want to fall back on old-fashioned
     * println debugging.
     *
     * Before doing so, first change any `test`/`testV` commands for the
