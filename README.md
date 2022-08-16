@@ -13,7 +13,7 @@ with many tutorial websites working in a similar fashion. **hwtest**
 implements this system for Scala and lets you create your own custom
 problems.
 
-### Depedencies
+### Dependencies
 
 If you use `sbt`, add these lines to your `build.sbt` file.
 ```scala
