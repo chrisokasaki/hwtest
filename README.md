@@ -13,6 +13,19 @@ with many tutorial websites working in a similar fashion. **hwtest**
 implements this system for Scala and lets you create your own custom
 problems.
 
+### Depedencies
+
+If you use `sbt`, add these lines to your `build.sbt` file.
+```scala
+  libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.12"
+  libraryDependencies += "org.okasaki" %% "hwtest" % "1.0.0"
+```
+
+### User Guides
+
+* [Guide for Teachers](guides/teacher.md)
+* [Guide for Students](guides/student.md)
+
 ## An Example
 
 A teacher might distribute the following starter code (most likely with
@@ -89,9 +102,3 @@ Begin testing isOdd at Tue Aug 09 10:24:25 EDT 2022
 Passed 5/5 tests in 0.15 seconds.
 ```
 Victory!
-
-## Further Reading
-
-* [Guide for Teachers](guides/teacher.md)
-* [Guide for Students](guides/student.md)
-* API... TBD
