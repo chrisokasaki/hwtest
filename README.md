@@ -21,10 +21,11 @@ If you use `sbt`, add these lines to your `build.sbt` file.
   libraryDependencies += "org.okasaki" %% "hwtest" % "1.0.0"
 ```
 
-### User Guides
+### User Guides and API
 
 * [Guide for Teachers](guides/teacher.md)
 * [Guide for Students](guides/student.md)
+* [API](https://okasaki.org/hwtest/api/hwtest/hw.html)
 
 ## An Example
 
